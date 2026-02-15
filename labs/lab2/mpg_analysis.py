@@ -22,7 +22,7 @@ plot_distribution(
     df, 'mpg',
     'Распределение расхода топлива (mpg)',
     'Миль на галлон (mpg)', 'Частота',
-    'data/mpg_distribution.png'
+    'utils/data/mpg_distribution.png'
 )
 
 print("\nГипотеза 1: Сравнение расхода топлива США и Японии")
@@ -64,6 +64,6 @@ numeric_df['origin_num'] = df['origin'].map({'usa': 0, 'europe': 1, 'japan': 2})
 plot_correlation_matrix(
     numeric_df, numeric_df.columns.tolist(),
     'Корреляционная матрица признаков (MPG)',
-    'data/correlation_matrix_mpg.png',
+    'utils/data/correlation_matrix_mpg.png',
     figsize=(10, 8)
 )

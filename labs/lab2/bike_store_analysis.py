@@ -86,5 +86,5 @@ corr_features = [col for col in corr_features if col in df_corr.columns]
 plot_correlation_matrix(
     df_corr.dropna(), corr_features,
     'Матрица корреляции признаков (Продажи)',
-    'data/correlation_matrix_sales.png'
+    'utils/data/correlation_matrix_sales.png'
 )
