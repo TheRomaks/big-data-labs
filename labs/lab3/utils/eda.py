@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 import pandas as pd
 from typing import List
@@ -29,11 +30,19 @@ def plot_feature_distributions(df: pd.DataFrame, numeric_cols: List[str], save_p
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.show()
 
-def plot_correlation_matrix(df: pd.DataFrame, numeric_cols: List[str], save_path: str):
+
+def plot_correlation_matrix(df: pd.DataFrame, numeric_cols: List[str], save_path: str, target_col: str = 'Class'):
+    cols_for_corr = numeric_cols.copy()
+    if target_col in df.columns:
+        cols_for_corr.append(target_col)
+
+    corr = df[cols_for_corr].corr()
+
     plt.figure(figsize=(12, 10))
-    corr = df[numeric_cols + ['Class']].corr()
-    sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', center=0)
-    plt.title('Корреляционная матрица признаков')
+    sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm',
+                center=0, square=True, linewidths=.5, cbar_kws={"shrink": .8})
+    plt.title('Матрица корреляции признаков')
+    plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.show()
 

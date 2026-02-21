@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import RobustScaler, StandardScaler
 from typing import Tuple, List
 
 def handle_missing_values(df: pd.DataFrame, numeric_cols: List[str]) -> pd.DataFrame:
@@ -27,10 +27,11 @@ def detect_outliers(df: pd.DataFrame, numeric_cols: List[str]) -> dict:
 def prepare_data(
         df: pd.DataFrame,
         test_size: float = 0.2,
-        random_state: int = 42
+        random_state: int = 42,
+        target_col: str = 'Class'
 ) -> Tuple:
-    X = df.drop(['id', 'Class'], axis=1, errors='ignore')
-    y = df['Class']
+    X = df.drop(['id', 'Id','quality', target_col], axis=1, errors='ignore')
+    y = df[target_col]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y

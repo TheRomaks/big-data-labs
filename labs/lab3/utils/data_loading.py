@@ -22,4 +22,6 @@ def get_numeric_features(df: pd.DataFrame, target_col: str = 'Class') -> List[st
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if target_col in numeric_cols:
         numeric_cols.remove(target_col)
+    if 'Id' in numeric_cols:
+        numeric_cols.remove('Id')
     return numeric_cols
