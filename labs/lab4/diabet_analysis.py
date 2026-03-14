@@ -8,27 +8,30 @@ from utils.visualization import (
     plot_knn_k_selection,
     plot_model_comparison,
     print_comparison_table,
-
+    print_best_model,
+    get_comparison_df
 )
 
 warnings.filterwarnings('ignore')
 
-def diabet_analysis():
-    df = load_data("utils/data/diabetes.csv")
+
+def diabet_analysis(filepath="utils/data/diabetes.csv", show_plots=False):
+    df = load_data(filepath)
     initial_inspection(df)
 
     numeric_cols = get_numeric_features(df, target_col='BMI')
-    compute_summary_stats(df, numeric_cols)
+
+    stats_df = compute_summary_stats(df, numeric_cols)
 
     print("\nАнализ целевой переменной BMI:")
     bmi_mode = df['BMI'].mode()[0]
     bmi_counts = df['BMI'].value_counts()
     print(f"Мода: {bmi_mode}")
     print(f"Распределение:\n{bmi_counts}")
-    print(f"Мода встречается {bmi_counts[bmi_mode]} раз")
 
-    plot_feature_distributions(df, numeric_cols, 'utils/data/diabetes_distribution.png')
-    plot_correlation_matrix(df, numeric_cols, 'utils/data/diabetes_correlation.png', target_col='BMI')
+    fig_dist = plot_feature_distributions(df, numeric_cols, 'utils/data/diabetes_distribution.png', show=show_plots)
+    fig_corr = plot_correlation_matrix(df, numeric_cols, 'utils/data/diabetes_correlation.png', target_col='BMI',
+                                       show=show_plots)
 
     hypotheses_list = [
         ("Уровень глюкозы влияет на BMI", 'Glucose', 0.3),
@@ -53,28 +56,37 @@ def diabet_analysis():
 
     data = prepare_data(df_processed, target_column='BMI', stratify=False)
 
-    X_train, X_test = data['X_train'], data['X_test']
-    y_train, y_test = data['y_train'], data['y_test']
-    scaler = data['scaler']
-    feature_names = data['feature_names']
+    models = train_all_models(data['X_train'], data['y_train'], data['X_test'], data['y_test'])
 
-    print(f"\nОбучающая выборка: {X_train.shape[0]} образцов")
-    print(f"Тестовая выборка: {X_test.shape[0]} образцов")
-    print(f"Количество признаков: {len(feature_names)}")
-
-    models = train_all_models(X_train, y_train, X_test, y_test)
-
-    plot_knn_k_selection(
-        models['KNN']['k_range'],
-        models['KNN']['k_scores'],
-        models['KNN']['optimal_k']
-    )
+    fig_knn = None
+    if 'KNN' in models and 'k_range' in models['KNN']:
+        fig_knn = plot_knn_k_selection(
+            models['KNN']['k_range'],
+            models['KNN']['k_scores'],
+            models['KNN']['optimal_k'],
+            save_path='utils/data/diabet_knn_k_selection.png',
+            show=show_plots
+        )
 
     metrics_dict = {name: model['metrics'] for name, model in models.items()}
     print_comparison_table(metrics_dict)
 
-    plot_model_comparison(metrics_dict)
+    metrics_df = get_comparison_df(metrics_dict)
+    fig_comp = plot_model_comparison(metrics_dict, save_path='utils/data/diabet_model_comparison.png', show=show_plots)
 
-    save_models(models, scaler,"diabet")
+    save_models(models, data['scaler'], "diabet")
+    best_name, best_model = print_best_model(models)
 
-diabet_analysis()
+    return {
+        'stats_df': stats_df,
+        'fig_dist': fig_dist,
+        'fig_corr': fig_corr,
+        'fig_comp': fig_comp,
+        'fig_knn': fig_knn,
+        'metrics_df': metrics_df,
+        'best_model_name': best_name
+    }
+
+
+if __name__ == "__main__":
+    diabet_analysis(show_plots=True)
