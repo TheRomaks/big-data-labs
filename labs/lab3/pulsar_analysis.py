@@ -39,7 +39,7 @@ for name, model in models.items():
             y_train, y_test, name, 'utils/data'
         )
         results[name] = metrics
-        print(pd.DataFrame([metrics]).round(3))
+        print(pd.DataFrame([metrics]).round(3).to_string(index=False))
 
         print("\n--- Проверка train/test gap ---")
         gap_metrics = train_test_gap(
@@ -47,7 +47,7 @@ for name, model in models.items():
             X_train_scaled, X_test_scaled,
             y_train, y_test
         )
-        print(pd.DataFrame([gap_metrics]).round(3))
+        print(pd.DataFrame([gap_metrics]).round(3).to_string(index=False))
 
         print("\n--- Cross-validation ---")
         cv_metrics = cross_validation_scores(
@@ -55,7 +55,7 @@ for name, model in models.items():
             X_train_scaled,
             y_train
         )
-        print(pd.DataFrame([cv_metrics]).round(3))
+        print(pd.DataFrame([cv_metrics]).round(3).to_string(index=False))
 
         print("\n--- Learning curve ---")
         plot_learning_curve(

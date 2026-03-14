@@ -61,6 +61,7 @@ results = {}
 models = get_models()
 
 for name, model in models.items():
+    print(f"\n{name}")
     metrics, _, _, _ = evaluate_model(
         model,
         X_train_scaled,
@@ -73,7 +74,7 @@ for name, model in models.items():
     )
 
     results[name] = metrics
-    print(pd.DataFrame([metrics]).round(4))
+    print(pd.DataFrame([metrics]).round(4).to_string(index=False))
 
 results_df = pd.DataFrame(results).T.round(4)
 print("\nСводная таблица метрик:")

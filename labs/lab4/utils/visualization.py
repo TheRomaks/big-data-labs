@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 
 
 def plot_knn_k_selection(k_range, k_scores, optimal_k, save_path='utils/data/knn_k_selection.png'):
@@ -52,11 +51,9 @@ def print_comparison_table(metrics_dict):
 
     print("Сравнительная таблица метрик")
 
-    # Форматирование вывода для читаемости (убираем научную нотацию)
     float_format = '{:,.2f}'.format
     styled_df = comparison_df.copy()
 
-    # Применяем форматирование к числовым колонкам
     for col in comparison_df.columns[1:]:
         styled_df[col] = comparison_df[col].apply(float_format)
 
@@ -66,36 +63,44 @@ def print_comparison_table(metrics_dict):
 
 
 def plot_model_comparison(metrics_dict, save_path='utils/data/car_model_comparison.png'):
-    fig, ax = plt.subplots(1, 1, figsize=(14, 8))
-
-    metrics_to_plot = ['MAE', 'RMSE', 'R2']
-    x = np.arange(len(metrics_to_plot))
-    width = 0.2
-
     models = ['Linear Regression', 'Lasso', 'ElasticNet', 'KNN']
     model_labels = ['Линейная', 'Lasso', 'ElasticNet', 'KNN']
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
 
-    for i, (model_name, color, label) in enumerate(zip(models, colors, model_labels)):
-        mae = metrics_dict[model_name]['MAE']
-        rmse = metrics_dict[model_name]['RMSE']
-        r2 = metrics_dict[model_name]['R2']
+    metrics_to_plot = ['MAE', 'MSE', 'RMSE', 'R2']
+    n_metrics = len(metrics_to_plot)
 
-        max_error = max([metrics_dict[m]['RMSE'] for m in models])
-        values = [mae / max_error, rmse / max_error, r2]
+    fig, axes = plt.subplots(1, n_metrics, figsize=(6 * n_metrics, 6))
 
-        ax.bar(x + i * width - width * 1.5, values, width,
-               label=label, color=color, alpha=0.8, edgecolor='black', linewidth=0.5)
+    for idx, metric in enumerate(metrics_to_plot):
+        ax = axes[idx]
 
-    ax.set_xlabel('Метрика', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Нормализованное значение', fontsize=12, fontweight='bold')
-    ax.set_xticks(x)
-    ax.set_xticklabels(metrics_to_plot, fontsize=11)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.set_title('Сравнение метрик качества всех моделей (нормализовано)',
-                 fontsize=14, fontweight='bold', pad=20)
+        values = [metrics_dict[m][metric] for m in models]
 
+        if metric in ['MAE', 'MSE', 'RMSE']:
+            bars = ax.bar(model_labels, values, color=colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+
+            for bar, val in zip(bars, values):
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 50,
+                        f'{val:,.0f}', ha='center', va='bottom', fontsize=10)
+
+            ax.set_ylabel(metric, fontsize=11, fontweight='bold')
+            ax.set_title(f'{metric}', fontsize=12, fontweight='bold', pad=10)
+        else:
+            bars = ax.bar(model_labels, values, color=colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+
+            for bar, val in zip(bars, values):
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+                        f'{val:.4f}', ha='center', va='bottom', fontsize=10)
+
+            ax.set_ylabel('R² Score', fontsize=11, fontweight='bold')
+            ax.set_ylim(0, 1.05)
+            ax.set_title(f'R²', fontsize=12, fontweight='bold', pad=10)
+
+        ax.set_xlabel('Модель', fontsize=11, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+
+    fig.suptitle('Сравнение всех моделей по всем метрикам', fontsize=18, fontweight='bold', y=0.95)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.show()

@@ -11,7 +11,6 @@ from utils.preprocessing import (
     remove_outliers_iqr,
     prepare_data,
     encode_categorical_variables,
-    calculate_metrics
 )
 from utils.visualization import (
     plot_knn_k_selection,
@@ -41,7 +40,7 @@ def car_price_analysis(filepath: str = 'utils/data/CarPrice_Assignment.csv'):
     df_processed = preprocess_car_data(df)
 
     plot_feature_distributions(df, numeric_cols, 'utils/data/car_distribution.png')
-    plot_correlation_matrix(df, numeric_cols, 'utils/data/car_correlation.png')
+    plot_correlation_matrix(df, numeric_cols, 'utils/data/car_correlation.png',target_col='price')
 
     categorical_cols = ['fueltype', 'aspiration', 'doornumber', 'carbody',
                         'drivewheel', 'enginelocation', 'enginetype',
