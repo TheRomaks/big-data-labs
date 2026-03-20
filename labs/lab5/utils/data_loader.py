@@ -10,7 +10,7 @@ def load_and_preprocess_data(choice, session_state=None):
         dataset_name = "Penguins"
     else:
         df = pd.read_csv("utils/data/final_cleaned_data.csv")
-        target_col = "order_status"
+        target_col = "brand_name"
         dataset_name = "Bike Sales"
 
     df = df.dropna()

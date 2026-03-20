@@ -58,7 +58,7 @@ queries = [
      JOIN products p      ON oi.product_id = p.product_id
      JOIN brands b        ON p.brand_id    = b.brand_id
      JOIN categories cat  ON p.category_id = cat.category_id
-     WHERE o.order_id = 1                     -- ← поменяй на существующий order_id, если 1 нет
+     WHERE o.order_id = 1                     
      ORDER BY oi.item_id;
      """),
 
