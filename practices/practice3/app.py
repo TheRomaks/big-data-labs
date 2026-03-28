@@ -123,7 +123,7 @@ elif page == "AutoML":
     with col_a:
         st.subheader("Обучение")
         if st.button("Запустить переобучение AutoML", help="FLAML начнет поиск лучшей модели"):
-            with st.spinner("Поиск лучшей модели (30 секунд)..."):
+            with st.spinner("Поиск лучшей модели"):
                 results = run_automl_training()
                 if results:
                     st.session_state['automl_results'] = results

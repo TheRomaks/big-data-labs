@@ -23,7 +23,6 @@ nltk.download('wordnet', quiet=True)
 
 morph = MorphAnalyzer()
 
-# Расширенные стоп-слова для русского
 extra_stop_ru = {
     "я", "ты", "вы", "мы", "он", "она", "оно", "они", "его", "её", "их",
     "мне", "тебе", "вам", "нам", "мой", "твоя", "твой", "ваш", "наш",
@@ -33,19 +32,22 @@ ru_stop = set(stopwords.words('russian')).union(extra_stop_ru)
 
 
 def preprocess_text(text, lang="ru"):
-    text = text.lower().strip()
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text).strip()
+
     if lang == "ru":
         text = re.sub(r'[^а-яё\s]', ' ', text)
         text = re.sub(r'\s+', ' ', text).strip()
         tokens = text.split()
-        tokens = [morph.parse(w)[0].normal_form for w in tokens
-                  if w not in ru_stop and len(w) > 2]
-    else:  # English
+        tokens = [morph.parse(w)[0].normal_form
+                  for w in tokens if w not in ru_stop and len(w) > 2]
+    else:
         text = re.sub(r'[^a-z\s]', ' ', text)
         text = re.sub(r'\s+', ' ', text).strip()
         lemmatizer = WordNetLemmatizer()
-        tokens = [lemmatizer.lemmatize(w) for w in text.split()
-                  if w not in stopwords.words('english') and len(w) > 2]
+        tokens = [lemmatizer.lemmatize(w)
+                  for w in text.split() if w not in stopwords.words('english') and len(w) > 2]
+
     return ' '.join(tokens), tokens
 
 
@@ -54,26 +56,24 @@ def parse_textarea_input(raw_text):
     current_class = None
     current_text = []
 
-    for line in raw_text.split('\n'):
+    for line in raw_text.splitlines():
         stripped = line.strip()
-        if not stripped:
-            if current_text and current_class is not None:
-                full_text = ' '.join(current_text).strip()
-                if full_text:
-                    documents.append((full_text, current_class))
-                current_text = []
-            continue
 
+        # Если встречаем метку класса, сохраняем предыдущий текст и начинаем новый
         if stripped in ('0', '1'):
             if current_text and current_class is not None:
                 full_text = ' '.join(current_text).strip()
                 if full_text:
                     documents.append((full_text, current_class))
-                current_text = []
             current_class = int(stripped)
+            current_text = []
         else:
-            current_text.append(line.strip())
+            # Накапливаем строки текста.
+            # Игнорируем пустые строки (строфы), они больше не разрывают документ.
+            if stripped:
+                current_text.append(stripped)
 
+    # Не забываем сохранить последний накопленный документ после завершения цикла
     if current_text and current_class is not None:
         full_text = ' '.join(current_text).strip()
         if full_text:
@@ -81,14 +81,11 @@ def parse_textarea_input(raw_text):
 
     return documents
 
-
-# ====================== Streamlit App ======================
 st.set_page_config(page_title="Лаб 6 — Песни vs Стихи", layout="wide")
 
 st.title("Лабораторная работа 6 — Обработка текста и классификация")
 st.markdown("**Песни (0) vs Стихи (1)** — Русский + Английский")
 
-# Боковая панель
 language = st.sidebar.selectbox("Язык данных", ["Русский", "Английский"], index=0)
 analysis_mode = st.sidebar.radio(
     "Режим анализа",
@@ -101,41 +98,27 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "3. Word2Vec + t-SNE", "4. Классификация"
 ])
 
-# ====================== Вкладка 1 ======================
 with tab1:
     st.subheader("Способ 1 — загрузка .txt файлов")
-    uploaded_files = st.file_uploader(
-        "Загрузите .txt файлы (каждый файл = одно произведение)",
-        type="txt", accept_multiple_files=True
-    )
+    uploaded_files = st.file_uploader("Загрузите .txt файлы", type="txt", accept_multiple_files=True)
 
-    st.subheader("Способ 2 — вставка текстов одним блоком")
-    raw_text_input = st.text_area(
-        "Вставьте тексты сюда",
-        height=380,
-        placeholder="""1
-Я помню чудное мгновенье...
+    st.subheader("Способ 2 — вставка текстов")
+    raw_text_input = st.text_area("Вставьте тексты", height=380,
+        placeholder="""1\nЯ помню чудное мгновенье...\n\n0\nВыйду ночью в поле с конём...""")
 
-0
-Выйду ночью в поле с конём...
-"""
-    )
+    all_data = []
 
-    all_data = []   # ← Здесь объявляем переменную
-
-    # Обработка загруженных .txt файлов
     if uploaded_files:
-        for file in uploaded_files:
+        for file in sorted(uploaded_files, key=lambda x: x.name):
             try:
-                text = file.read().decode('utf-8')
+                text = file.read().decode('utf-8-sig')
                 lower_name = file.name.lower()
                 label = 0 if any(k in lower_name for k in ['песн', 'song', 'track', '0']) else 1
                 class_name = "песня" if label == 0 else "стих"
                 all_data.append((text, label, class_name, file.name))
             except Exception as e:
-                st.warning(f"Не удалось прочитать {file.name}: {e}")
+                st.warning(f"Ошибка чтения {file.name}")
 
-    # Обработка текстового поля
     if raw_text_input.strip():
         textarea_docs = parse_textarea_input(raw_text_input)
         for text, label in textarea_docs:
@@ -145,42 +128,35 @@ with tab1:
     if all_data:
         df = pd.DataFrame(all_data, columns=["raw_text", "label", "class_name", "source"])
 
-        # Фильтрация по выбранному режиму
         if analysis_mode == "Только песни (класс 0)":
             df = df[df["label"] == 0].copy()
         elif analysis_mode == "Только стихи (класс 1)":
             df = df[df["label"] == 1].copy()
 
+        df = df.sort_values(by="raw_text").reset_index(drop=True)
+
         if len(df) == 0:
-            st.warning("В выбранном режиме нет текстов")
+            st.warning("Нет текстов в выбранном режиме")
             st.stop()
 
-        st.success(f"После фильтрации: **{len(df)}** текстов → **{analysis_mode}** ({language})")
+        st.success(f"Загружено **{len(df)}** текстов → **{analysis_mode}** ({language})")
 
-        preview_df = df.copy()
-        preview_df["preview"] = preview_df["raw_text"].str.replace(r"\n", " ", regex=True).str[:100] + "..."
-        st.dataframe(preview_df[["source", "class_name", "label", "preview"]], use_container_width=True)
-
-        # Препроцессинг
+        lang_code = "ru" if language == "Русский" else "en"
         with st.spinner("Лемматизация..."):
-            lang_code = "ru" if language == "Русский" else "en"
             df[["clean_text", "tokens"]] = df["raw_text"].apply(
                 lambda x: pd.Series(preprocess_text(x, lang_code))
             )
 
-        if st.checkbox("Показать очищенные тексты (для отладки)", value=False):
-            st.dataframe(df[["class_name", "clean_text"]])
-
-        all_tokens_flat = [t for sublist in df["tokens"] for t in sublist]
+        if st.checkbox("Показать очищенные тексты (debug)", value=False):
+            st.dataframe(df[["class_name", "clean_text"]].style.set_properties(**{'white-space': 'pre-wrap'}))
 
         st.session_state.df = df
-        st.session_state.all_tokens = all_tokens_flat
         st.session_state.cleaned_texts = df["clean_text"].tolist()
+        st.session_state.tokens_list = df["tokens"].tolist()
+        st.session_state.all_tokens = [t for sublist in df["tokens"] for t in sublist]
         st.session_state.analysis_mode = analysis_mode
         st.session_state.language = language
 
-
-# ====================== Вкладка 2 ======================
 with tab2:
     if "df" not in st.session_state:
         st.info("Загрузите данные на первой вкладке")
@@ -191,7 +167,6 @@ with tab2:
         min_df_val = max(1, min(2, n_docs // 3))
 
         vec = TfidfVectorizer(max_features=500, min_df=min_df_val, max_df=0.95)
-
         X = vec.fit_transform(st.session_state.cleaned_texts)
 
         sums = X.sum(axis=0).A1
@@ -209,13 +184,11 @@ with tab2:
         ax.axis("off")
         st.pyplot(fig)
 
-
-# ====================== Вкладка 3 ======================
 with tab3:
     if "df" not in st.session_state:
         st.info("Загрузите данные")
     else:
-        sentences = st.session_state.df["tokens"].tolist()
+        sentences = st.session_state.tokens_list
 
         if len(sentences) < 6:
             st.warning("Недостаточно данных для Word2Vec")
@@ -246,20 +219,19 @@ with tab3:
                 for i, word in enumerate(common_words):
                     ax.text(emb_2d[i, 0] + 0.1, emb_2d[i, 1], word, fontsize=10)
                 st.pyplot(fig)
+            else:
+                st.info("Недостаточно уникальных слов для t-SNE")
 
 
-# ====================== Вкладка 4 ======================
 with tab4:
-    if "df" not in st.session_state:
-        st.info("Загрузите данные")
-    elif st.session_state.analysis_mode != "Вместе (песни + стихи)":
-        st.info("Классификация доступна только в режиме «Вместе (песни + стихи)»")
+    if "df" not in st.session_state or st.session_state.analysis_mode != "Вместе (песни + стихи)":
+        st.info("Классификация доступна только в режиме «Вместе»")
     elif len(st.session_state.df) < 6:
-        st.info("Недостаточно данных для классификации")
+        st.info("Недостаточно данных")
     else:
-        st.caption(f"Классификация: песни (0) vs стихи (1) • {len(st.session_state.df)} текстов")
+        st.caption(f"Классификация • {len(st.session_state.df)} текстов")
 
-        vec = TfidfVectorizer(max_features=600, min_df=1, max_df=0.95)
+        vec = TfidfVectorizer(max_features=700, min_df=1, max_df=0.95)
         X = vec.fit_transform(st.session_state.cleaned_texts)
         y = st.session_state.df["label"].values
 
@@ -268,9 +240,9 @@ with tab4:
         )
 
         models = {
-            "Logistic Regression": LogisticRegression(max_iter=3000, solver='liblinear', random_state=42),
+            "Logistic Regression": LogisticRegression(max_iter=4000, solver='liblinear', random_state=42, C=1.0),
             "Linear SVC": SVC(kernel="linear", probability=True, random_state=42),
-            "Random Forest": RandomForestClassifier(n_estimators=150, max_depth=10, random_state=42)
+            "Random Forest": RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42)
         }
 
         results = []
@@ -281,7 +253,5 @@ with tab4:
             results.append({"Модель": name, "Accuracy": f"{acc:.3f}"})
 
         st.table(pd.DataFrame(results))
-        best_model = max(results, key=lambda x: float(x["Accuracy"]))["Модель"]
-        st.success(f"**Лучшая модель:** {best_model}")
-
-st.caption("Лабораторная работа 6.1 • Исправлена стабильность моделей • 2026")
+        best = max(results, key=lambda x: float(x["Accuracy"]))["Модель"]
+        st.success(f"**Лучшая модель:** {best}")
