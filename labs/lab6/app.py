@@ -59,7 +59,6 @@ def parse_textarea_input(raw_text):
     for line in raw_text.splitlines():
         stripped = line.strip()
 
-        # Если встречаем метку класса, сохраняем предыдущий текст и начинаем новый
         if stripped in ('0', '1'):
             if current_text and current_class is not None:
                 full_text = ' '.join(current_text).strip()
@@ -68,12 +67,10 @@ def parse_textarea_input(raw_text):
             current_class = int(stripped)
             current_text = []
         else:
-            # Накапливаем строки текста.
-            # Игнорируем пустые строки (строфы), они больше не разрывают документ.
+
             if stripped:
                 current_text.append(stripped)
 
-    # Не забываем сохранить последний накопленный документ после завершения цикла
     if current_text and current_class is not None:
         full_text = ' '.join(current_text).strip()
         if full_text:
