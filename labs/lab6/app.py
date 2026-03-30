@@ -48,7 +48,9 @@ def preprocess_text(text, lang="ru"):
         tokens = [lemmatizer.lemmatize(w)
                   for w in text.split() if w not in stopwords.words('english') and len(w) > 2]
 
-    return ' '.join(tokens), tokens
+    unique_tokens = sorted(list(set(tokens)))
+
+    return ' '.join(unique_tokens), unique_tokens
 
 
 def parse_textarea_input(raw_text):
@@ -67,7 +69,6 @@ def parse_textarea_input(raw_text):
             current_class = int(stripped)
             current_text = []
         else:
-
             if stripped:
                 current_text.append(stripped)
 
@@ -77,6 +78,7 @@ def parse_textarea_input(raw_text):
             documents.append((full_text, current_class))
 
     return documents
+
 
 st.set_page_config(page_title="Лаб 6 — Песни vs Стихи", layout="wide")
 
@@ -101,7 +103,7 @@ with tab1:
 
     st.subheader("Способ 2 — вставка текстов")
     raw_text_input = st.text_area("Вставьте тексты", height=380,
-        placeholder="""1\nЯ помню чудное мгновенье...\n\n0\nВыйду ночью в поле с конём...""")
+                                  placeholder="""1\nЯ помню чудное мгновенье...\n\n0\nВыйду ночью в поле с конём...""")
 
     all_data = []
 
@@ -144,6 +146,12 @@ with tab1:
                 lambda x: pd.Series(preprocess_text(x, lang_code))
             )
 
+        df = df[df["clean_text"].str.strip() != ""]
+
+        if len(df) == 0:
+            st.warning("После очистки от стоп-слов не осталось текста. Добавьте более объемные тексты.")
+            st.stop()
+
         if st.checkbox("Показать очищенные тексты (debug)", value=False):
             st.dataframe(df[["class_name", "clean_text"]].style.set_properties(**{'white-space': 'pre-wrap'}))
 
@@ -161,25 +169,29 @@ with tab2:
         st.caption(f"Анализ: **{st.session_state.analysis_mode}** • {len(st.session_state.df)} текстов")
 
         n_docs = len(st.session_state.cleaned_texts)
-        min_df_val = max(1, min(2, n_docs // 3))
+        min_df_val = 1
 
-        vec = TfidfVectorizer(max_features=500, min_df=min_df_val, max_df=0.95)
-        X = vec.fit_transform(st.session_state.cleaned_texts)
+        try:
+            vec = TfidfVectorizer(max_features=500, min_df=min_df_val, max_df=0.95)
+            X = vec.fit_transform(st.session_state.cleaned_texts)
 
-        sums = X.sum(axis=0).A1
-        names = vec.get_feature_names_out()
-        top_words = sorted(zip(names, sums), key=lambda x: x[1], reverse=True)[:25]
+            sums = X.sum(axis=0).A1
+            names = vec.get_feature_names_out()
+            top_words = sorted(zip(names, sums), key=lambda x: x[1], reverse=True)[:25]
 
-        st.subheader("Топ-25 слов по TF-IDF")
-        st.table(pd.DataFrame(top_words, columns=["Слово", "Вес TF-IDF"]))
+            st.subheader("Топ-25 слов по TF-IDF")
+            st.table(pd.DataFrame(top_words, columns=["Слово", "Вес TF-IDF"]))
+        except ValueError:
+            st.error("Слишком мало уникальных слов для построения TF-IDF.")
 
         st.subheader("Облако слов")
         wc_text = " ".join(st.session_state.cleaned_texts)
-        wc = WordCloud(width=1000, height=600, background_color="white", max_words=180).generate(wc_text)
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.imshow(wc, interpolation="bilinear")
-        ax.axis("off")
-        st.pyplot(fig)
+        if wc_text.strip():
+            wc = WordCloud(width=1000, height=600, background_color="white", max_words=180).generate(wc_text)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.imshow(wc, interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig)
 
 with tab3:
     if "df" not in st.session_state:
@@ -208,7 +220,7 @@ with tab3:
 
             if len(common_words) >= 5:
                 vectors = np.array([model.wv[w] for w in common_words])
-                tsne = TSNE(n_components=2, perplexity=min(15, len(vectors)-1), random_state=42)
+                tsne = TSNE(n_components=2, perplexity=min(15, len(vectors) - 1), random_state=42)
                 emb_2d = tsne.fit_transform(vectors)
 
                 fig, ax = plt.subplots(figsize=(10, 8))
@@ -219,36 +231,72 @@ with tab3:
             else:
                 st.info("Недостаточно уникальных слов для t-SNE")
 
-
 with tab4:
     if "df" not in st.session_state or st.session_state.analysis_mode != "Вместе (песни + стихи)":
         st.info("Классификация доступна только в режиме «Вместе»")
     elif len(st.session_state.df) < 6:
-        st.info("Недостаточно данных")
+        st.info("Недостаточно данных (нужно минимум 6 текстов)")
+    elif len(np.unique(st.session_state.df["label"])) < 2:
+        st.warning("Для обучения нужны тексты обоих классов (и песни, и стихи).")
     else:
         st.caption(f"Классификация • {len(st.session_state.df)} текстов")
 
-        vec = TfidfVectorizer(max_features=700, min_df=1, max_df=0.95)
-        X = vec.fit_transform(st.session_state.cleaned_texts)
-        y = st.session_state.df["label"].values
+        vec = TfidfVectorizer(max_features=700, min_df=1)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42, stratify=y
-        )
+        try:
+            X = vec.fit_transform(st.session_state.cleaned_texts)
+            y = st.session_state.df["label"].values
+            indices = st.session_state.df.index
 
-        models = {
-            "Logistic Regression": LogisticRegression(max_iter=4000, solver='liblinear', random_state=42, C=1.0),
-            "Linear SVC": SVC(kernel="linear", probability=True, random_state=42),
-            "Random Forest": RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42)
-        }
+            X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(
+                X, y, indices, test_size=0.3, random_state=42, stratify=y
+            )
 
-        results = []
-        for name, clf in models.items():
-            clf.fit(X_train, y_train)
-            pred = clf.predict(X_test)
-            acc = accuracy_score(y_test, pred)
-            results.append({"Модель": name, "Accuracy": f"{acc:.3f}"})
+            models = {
+                "Logistic Regression": LogisticRegression(max_iter=4000, solver='liblinear', random_state=42, C=1.0),
+                "Linear SVC": SVC(kernel="linear", probability=True, random_state=42),
+                "Random Forest": RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42)
+            }
 
-        st.table(pd.DataFrame(results))
-        best = max(results, key=lambda x: float(x["Accuracy"]))["Модель"]
-        st.success(f"**Лучшая модель:** {best}")
+            results = []
+            best_acc = -1
+            best_model_name = ""
+            best_model = None
+
+            for name, clf in models.items():
+                clf.fit(X_train, y_train)
+                pred = clf.predict(X_test)
+                acc = accuracy_score(y_test, pred)
+                results.append({"Модель": name, "Accuracy": f"{acc:.3f}"})
+
+                if acc > best_acc:
+                    best_acc = acc
+                    best_model_name = name
+                    best_model = clf
+
+            st.table(pd.DataFrame(results))
+            st.success(f"**Лучшая модель:** {best_model_name}")
+
+            st.subheader("Примеры классификации на тестовой выборке")
+            st.markdown(
+                f"Здесь показано, как модель **{best_model_name}** классифицировала тексты, которые она не видела при обучении:")
+
+            best_pred = best_model.predict(X_test)
+
+            predictions_df = pd.DataFrame({
+                "Оригинальный текст": st.session_state.df.loc[idx_test, "raw_text"].apply(
+                    lambda x: x[:120] + "..." if len(x) > 120 else x),
+                "Истинный класс": ["Стих (1)" if val == 1 else "Песня (0)" for val in y_test],
+                "Предсказание модели": ["Стих (1)" if val == 1 else "Песня (0)" for val in best_pred]
+            })
+
+            predictions_df["Результат"] = np.where(
+                predictions_df["Истинный класс"] == predictions_df["Предсказание модели"],
+                "Верно",
+                "Ошибка"
+            )
+
+            st.dataframe(predictions_df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Не удалось выполнить классификацию: {e}")
